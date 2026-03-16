@@ -2,6 +2,15 @@
 
 A collection of royalty-free background music tracks plus an Instagram DM polling script that automatically downloads newly shared media (images & videos) and uploads them to Google Drive.
 
+## About this project
+
+This repository has two purposes:
+
+1. **Royalty-free music library** – 25 background music tracks (MP3) that are free to use in videos, presentations, and other projects.
+2. **Instagram → Google Drive automation** – a Python script (`instagram_poller.py`) that watches an Instagram Business/Creator account's Direct Messages, detects newly shared images and videos, and automatically uploads them to a designated Google Drive folder.
+
+The automation runs as a scheduled GitHub Actions workflow (every 30 minutes) so no always-on server is required.  All credentials are stored as GitHub repository secrets — nothing sensitive is ever committed to the repository.
+
 ---
 
 ## Instagram → Google Drive poller
