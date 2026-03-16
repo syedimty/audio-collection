@@ -154,11 +154,25 @@ def download_media(url: str) -> bytes:
 
 
 def build_drive_service():
-    """Build and return an authorised Google Drive API service."""
-    credentials = service_account.Credentials.from_service_account_file(
-        GOOGLE_SERVICE_ACCOUNT_JSON,
-        scopes=DRIVE_SCOPES,
-    )
+    """Build and return an authorised Google Drive API service.
+
+    Credentials are loaded from the ``GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT``
+    environment variable (raw JSON string) when present, which is the
+    recommended approach for CI/CD environments such as GitHub Actions.
+    Otherwise the path in ``GOOGLE_SERVICE_ACCOUNT_JSON`` is used.
+    """
+    json_content = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT")
+    if json_content:
+        info = json.loads(json_content)
+        credentials = service_account.Credentials.from_service_account_info(
+            info,
+            scopes=DRIVE_SCOPES,
+        )
+    else:
+        credentials = service_account.Credentials.from_service_account_file(
+            GOOGLE_SERVICE_ACCOUNT_JSON,
+            scopes=DRIVE_SCOPES,
+        )
     return build("drive", "v3", credentials=credentials, cache_discovery=False)
 
 
@@ -276,6 +290,23 @@ def process_new_messages(state: dict, drive_service) -> dict:
     return state
 
 
+def run_once() -> None:
+    """Run a single poll iteration and exit.
+
+    This is the recommended mode for scheduled environments such as
+    GitHub Actions, where the scheduler (cron) controls the interval.
+    """
+    logger.info(
+        "Running single Instagram media poll (Drive folder: %s).",
+        GOOGLE_DRIVE_FOLDER_ID,
+    )
+    drive_service = build_drive_service()
+    state = load_state(STATE_FILE)
+    state = process_new_messages(state, drive_service)
+    save_state(STATE_FILE, state)
+    logger.info("Poll complete.")
+
+
 def run_poll_loop() -> None:
     """Run the polling loop indefinitely, sleeping *POLL_INTERVAL* seconds between runs."""
     logger.info(
@@ -305,4 +336,7 @@ def run_poll_loop() -> None:
 
 
 if __name__ == "__main__":
-    run_poll_loop()
+    if os.getenv("RUN_ONCE", "").lower() in ("1", "true", "yes"):
+        run_once()
+    else:
+        run_poll_loop()

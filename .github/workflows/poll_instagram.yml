@@ -1,0 +1,61 @@
+name: Poll Instagram Messages
+
+on:
+  # Run automatically every 30 minutes
+  schedule:
+    - cron: '*/30 * * * *'
+  # Allow manual triggers from the GitHub Actions UI
+  workflow_dispatch:
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # Restore the state file from the previous run so we don't reprocess
+      # messages that were already handled.
+      - name: Restore poller state cache
+        uses: actions/cache/restore@v4
+        with:
+          path: last_seen.json
+          # Each run writes a new entry; restore-keys picks up the latest one.
+          key: instagram-poller-state-${{ github.run_number }}
+          restore-keys: |
+            instagram-poller-state-
+
+      - name: Run Instagram media poller (single poll)
+        env:
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          INSTAGRAM_USER_ID: ${{ secrets.INSTAGRAM_USER_ID }}
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+          # Full contents of the Google service-account JSON key file.
+          # Store the JSON text in a repository secret named
+          # GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT.
+          GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT }}
+          RUN_ONCE: 'true'
+        run: python instagram_poller.py
+
+      # Persist the updated state so the next scheduled run can continue
+      # from where this one left off.
+      - name: Save poller state cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: last_seen.json
+          key: instagram-poller-state-${{ github.run_number }}
